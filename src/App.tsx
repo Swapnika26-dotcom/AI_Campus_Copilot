@@ -1,15 +1,19 @@
-import React, { useState } from 'react';
-import { GraduationCap, BookOpen, Lightbulb, Briefcase, Menu, X, Moon, Sun, Search, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { GraduationCap, BookOpen, Lightbulb, Briefcase, Menu, X, Moon, Sun, Search, ChevronRight, LogOut, User as UserIcon, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import StudyBuddy from './components/StudyBuddy';
 import IdeaGenerator from './components/IdeaGenerator';
 import PlacementCoach from './components/PlacementCoach';
 import JobAnalyzer from './components/JobAnalyzer';
+import Login from './components/Login';
 import { cn } from './lib/utils';
+import { auth, onAuthStateChanged, signOut, User } from './lib/firebase';
 
 type Tab = 'home' | 'study' | 'ideas' | 'placement' | 'jobs';
 
 export default function App() {
+  const [user, setUser] = useState<User | null>(null);
+  const [isAuthReady, setIsAuthReady] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>('home');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isDark, setIsDark] = useState(true);
@@ -21,8 +25,17 @@ export default function App() {
     document.documentElement.classList.toggle('dark');
   };
 
+  // Auth Listener
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setIsAuthReady(true);
+    });
+    return () => unsubscribe();
+  }, []);
+
   // Initialize dark mode and handle custom tab change events
-  React.useEffect(() => {
+  useEffect(() => {
     document.documentElement.classList.add('dark');
     
     const handleTabChange = (e: any) => {
@@ -32,6 +45,15 @@ export default function App() {
     window.addEventListener('changeTab', handleTabChange);
     return () => window.removeEventListener('changeTab', handleTabChange);
   }, []);
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      setActiveTab('home');
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
+  };
 
   const navItems = [
     { id: 'home', label: 'Home', icon: GraduationCap },
@@ -65,6 +87,18 @@ export default function App() {
       </button>
     </motion.div>
   );
+
+  if (!isAuthReady) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-10 h-10 text-primary animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Login />;
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
@@ -102,13 +136,23 @@ export default function App() {
                   )}
                 </button>
               ))}
-              <div className="ml-4 pl-4 border-l">
+              <div className="ml-4 pl-4 border-l flex items-center gap-2">
                 <button
                   onClick={toggleTheme}
                   className="p-2 rounded-full hover:bg-muted transition-colors"
                 >
                   {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
                 </button>
+                {user && (
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
+                    title="Sign Out"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Logout</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -165,6 +209,13 @@ export default function App() {
                     )}
                   </button>
                 ))}
+                <button
+                  onClick={handleLogout}
+                  className="w-full px-4 py-3 rounded-xl text-left text-sm font-medium flex items-center gap-3 text-destructive hover:bg-destructive/10 transition-all font-bold"
+                >
+                  <LogOut className="w-5 h-5" />
+                  Logout
+                </button>
               </div>
             </motion.div>
           )}
@@ -256,7 +307,7 @@ export default function App() {
                 
                 <div className="flex-1 space-y-6 relative z-10">
                   <h2 className="text-3xl md:text-5xl font-display font-bold leading-tight">Ready to excel in your engineering journey?</h2>
-                  <p className="text-lg text-muted-foreground">Join thousands of students using AI Campus Copilot to stay ahead in their academics and career.</p>
+                  <p className="text-lg text-muted-foreground">Welcome back, <span className="text-primary font-bold">{user.displayName}</span>! Join thousands of students using AI Campus Copilot to stay ahead in their academics and career.</p>
                   <button 
                     onClick={() => setActiveTab('study')}
                     className="bg-primary text-primary-foreground px-10 py-4 rounded-full font-bold text-lg hover:opacity-90 transition-all shadow-xl shadow-primary/20"
